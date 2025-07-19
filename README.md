@@ -1,4 +1,4 @@
-# Conway's Game of Life - Edición a Color 🌈
+# Conway's Game of Life 
 
 Este es un proyecto que implementa el famoso [Juego de la Vida de Conway](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) utilizando Rust y la biblioteca Raylib.
 
