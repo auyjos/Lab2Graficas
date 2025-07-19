@@ -8,6 +8,10 @@ El Juego de la Vida no es realmente un "juego" en el sentido tradicional, sino u
 
 ![Ejemplo del Juego de la Vida](https://upload.wikimedia.org/wikipedia/commons/e/e5/Gospers_glider_gun.gif)
 
+## 🎮 Demostración
+
+![Demostración del Juego](./assets/game.gif)
+
 ## 🧠 Reglas del juego
 
 1. Una célula **viva** con menos de 2 vecinos vivos **muere** por subpoblación.

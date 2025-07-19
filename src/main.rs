@@ -4,6 +4,7 @@ mod line;
 use std::{thread, time::Duration};
 use raylib::prelude::*;
 use framebuffer::Framebuffer;
+use rand::{thread_rng, Rng};
 
 // Grid dimensions for the Game of Life (use a lower resolution as suggested)
 const GRID_WIDTH: u32 = 100;
@@ -140,6 +141,53 @@ fn create_lwss(grid: &mut Vec<Vec<bool>>, x: usize, y: usize) {
     }
 }
 
+// Middle-weight spaceship (MWSS)
+fn create_mwss(grid: &mut Vec<Vec<bool>>, x: usize, y: usize) {
+    if x + 6 < GRID_WIDTH as usize && y + 5 < GRID_HEIGHT as usize {
+        // Head
+        grid[y][x+1] = true;
+        grid[y][x+4] = true;
+        // Body
+        grid[y+1][x] = true;
+        grid[y+2][x] = true;
+        grid[y+3][x] = true;
+        grid[y+3][x+5] = true;
+        grid[y+2][x+5] = true;
+        grid[y+1][x+5] = true;
+        // Tail
+        grid[y+4][x+1] = true;
+        grid[y+4][x+2] = true;
+        grid[y+4][x+3] = true;
+        grid[y+4][x+4] = true;
+    }
+}
+
+// Heavy-weight spaceship (HWSS)
+fn create_hwss(grid: &mut Vec<Vec<bool>>, x: usize, y: usize) {
+    if x + 7 < GRID_WIDTH as usize && y + 5 < GRID_HEIGHT as usize {
+        // Head
+        grid[y][x+1] = true;
+        grid[y][x+2] = true;
+        grid[y][x+3] = true;
+        grid[y][x+4] = true;
+        grid[y][x+5] = true;
+        grid[y][x+6] = true;
+        // Body
+        grid[y+1][x] = true;
+        grid[y+2][x] = true;
+        grid[y+3][x] = true;
+        grid[y+4][x+1] = true;
+        grid[y+4][x+2] = true;
+        grid[y+4][x+3] = true;
+        grid[y+4][x+4] = true;
+        grid[y+4][x+5] = true;
+        // Tail at sides
+        grid[y+1][x+6] = true;
+        grid[y+2][x+6] = true;
+        grid[y+3][x+6] = true;
+    }
+}
+
 // Function to create a pulsar pattern (large oscillator)
 fn create_pulsar(grid: &mut Vec<Vec<bool>>, x: usize, y: usize) {
     if x + 12 < GRID_WIDTH as usize && y + 12 < GRID_HEIGHT as usize {
@@ -264,6 +312,18 @@ enum CellType {
     Dead        // Dead cells
 }
 
+// Function to map cell type to its display color
+fn get_color(cell_type: CellType) -> Color {
+    match cell_type {
+        CellType::StillLife => STILL_LIFE_COLOR,
+        CellType::Oscillator => OSCILLATOR_COLOR,
+        CellType::Spaceship => SPACESHIP_COLOR,
+        CellType::Custom => CUSTOM_COLOR,
+        CellType::Generated => GENERATED_COLOR,
+        CellType::Dead => BACKGROUND_COLOR,
+    }
+}
+
 // Initialize the grid with various life forms
 fn initialize_grid() -> (Vec<Vec<bool>>, Vec<Vec<CellType>>) {
     let mut grid = vec![vec![false; GRID_WIDTH as usize]; GRID_HEIGHT as usize];
@@ -326,6 +386,36 @@ fn initialize_grid() -> (Vec<Vec<bool>>, Vec<Vec<CellType>>) {
     mark_region(&mut grid, &mut cell_types, 20, 50, 7, 2, CellType::Custom);
     create_diehard(&mut grid, 60, 50);
     mark_region(&mut grid, &mut cell_types, 60, 50, 8, 3, CellType::Custom);
+    
+    // Add more spaceships
+    create_mwss(&mut grid, 20, 60);
+    mark_region(&mut grid, &mut cell_types, 20, 60, 6, 5, CellType::Spaceship);
+    create_hwss(&mut grid, 30, 60);
+    mark_region(&mut grid, &mut cell_types, 30, 60, 7, 5, CellType::Spaceship);
+    
+    // Add more still lifes in different areas
+    create_block(&mut grid, 50, 30);
+    mark_region(&mut grid, &mut cell_types, 50, 30, 2, 2, CellType::StillLife);
+    create_beehive(&mut grid, 60, 30);
+    mark_region(&mut grid, &mut cell_types, 60, 30, 4, 3, CellType::StillLife);
+    
+    // Add more oscillators
+    create_beacon(&mut grid, 40, 20);
+    mark_region(&mut grid, &mut cell_types, 40, 20, 4, 4, CellType::Oscillator);
+    create_toad(&mut grid, 50, 20);
+    mark_region(&mut grid, &mut cell_types, 50, 20, 4, 2, CellType::Oscillator);
+    
+    // Add random cells for more dynamism
+    let mut rng = thread_rng();
+    for y in 0..GRID_HEIGHT as usize {
+        for x in 0..GRID_WIDTH as usize {
+           if rng.r#gen::<f64>() < 0.02  { 
+                // 2% chance of a cell being alive
+                grid[y][x] = true;
+                cell_types[y][x] = CellType::Generated;
+            }
+        }
+    }
 
     (grid, cell_types)
 }
@@ -398,54 +488,48 @@ fn update_grid(data: &(Vec<Vec<bool>>, Vec<Vec<CellType>>)) -> (Vec<Vec<bool>>, 
 
 // Render the grid onto the framebuffer
 fn render_grid(data: &(Vec<Vec<bool>>, Vec<Vec<CellType>>), framebuffer: &mut Framebuffer) {
-    framebuffer.clear();
-    
+    // Removed full clear to allow incremental rendering via background color per cell
+
     let (grid, cell_types) = data;
-    
+
     // Calculate cell size based on framebuffer dimensions and grid size
     // Leave space for UI and borders
     let fb_width = framebuffer.width() as u32;
     let fb_height = framebuffer.height() as u32;
-    
+
     // Reserve 40px for the UI at the bottom
     let available_height = if fb_height > 40 { fb_height - 40 } else { fb_height };
-    
+
     // Calculate dynamic cell size based on available space
     let horizontal_cell_size = (fb_width - (BORDER_SIZE * 2)) / GRID_WIDTH;
     let vertical_cell_size = (available_height - (BORDER_SIZE * 2)) / GRID_HEIGHT;
-    
+
     // Use the smaller of the two to maintain square cells
     let cell_size = horizontal_cell_size.min(vertical_cell_size).max(1); // Ensure at least 1px
-    
+
     // Calculate border to center the grid
     let horizontal_border = (fb_width - (GRID_WIDTH * cell_size)) / 2;
     let vertical_border = (available_height - (GRID_HEIGHT * cell_size)) / 2;
-    
+
+    // Draw each cell as either background or its type color
     for y in 0..GRID_HEIGHT as usize {
         for x in 0..GRID_WIDTH as usize {
-            if grid[y][x] {
-                // Set the color based on the cell type
-                match cell_types[y][x] {
-                    CellType::StillLife => framebuffer.set_current_color(STILL_LIFE_COLOR),
-                    CellType::Oscillator => framebuffer.set_current_color(OSCILLATOR_COLOR),
-                    CellType::Spaceship => framebuffer.set_current_color(SPACESHIP_COLOR),
-                    CellType::Custom => framebuffer.set_current_color(CUSTOM_COLOR),
-                    CellType::Generated => framebuffer.set_current_color(GENERATED_COLOR),
-                    _ => framebuffer.set_current_color(Color::WHITE), // Shouldn't happen
-                }
-                
-                // Draw a cell_size x cell_size square for each cell
-                for dy in 0..cell_size {
-                    for dx in 0..cell_size {
-                        let px = horizontal_border + (x as u32 * cell_size) + dx;
-                        let py = vertical_border + (y as u32 * cell_size) + dy;
-                        framebuffer.set_pixel(px, py);
-                    }
+            let color = if grid[y][x] {
+                get_color(cell_types[y][x])
+            } else {
+                BACKGROUND_COLOR
+            };
+            framebuffer.set_current_color(color);
+            for dy in 0..cell_size {
+                for dx in 0..cell_size {
+                    let px = horizontal_border + (x as u32 * cell_size) + dx;
+                    let py = vertical_border + (y as u32 * cell_size) + dy;
+                    framebuffer.set_pixel(px, py);
                 }
             }
         }
     }
-    
+
     // Draw a frame around the grid
     framebuffer.set_current_color(Color::WHITE);
     for x in 0..GRID_WIDTH * cell_size + 2 {
